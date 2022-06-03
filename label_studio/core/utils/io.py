@@ -1,6 +1,8 @@
 """This file and its contents are licensed under the Apache License 2.0. Please see the included NOTICE for copyright information and LICENSE for a copy of the license.
 """
 import os
+import socket
+import ipaddress
 import pkg_resources
 import shutil
 import glob
@@ -9,8 +11,10 @@ import ujson as json
 import itertools
 import yaml
 
+from urllib.parse import urlparse
 from contextlib import contextmanager
 from tempfile import mkstemp, mkdtemp
+from core.utils.exceptions import LabelStudioAPIException
 
 from appdirs import user_config_dir, user_data_dir, user_cache_dir
 
@@ -163,3 +167,22 @@ class SerializableGenerator(list):
 
     def __iter__(self):
         return itertools.chain(self._head, *self[:1])
+
+
+def url_is_local(url):
+    domain = urlparse(url).hostname
+    try:
+        ip = socket.gethostbyname(domain)
+    except socket.error:
+        raise LabelStudioAPIException(f"Can't resolve hostname {domain}")
+    else:
+        local_subnets = [
+            '127.0.0.0/8',
+            '10.0.0.0/8',
+            '172.16.0.0/12',
+            '192.168.0.0/16',
+        ]
+        for subnet in local_subnets:
+            if ipaddress.ip_address(ip) in ipaddress.ip_network(subnet):
+                return True
+        return False
